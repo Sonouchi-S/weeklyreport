@@ -1,0 +1,56 @@
+services:
+  # ① MariaDBコンテナ
+  db:
+    image: mariadb:latest
+    container_name: mariadb_container
+    environment:
+      MYSQL_ROOT_PASSWORD: mariadbroot
+      MYSQL_DATABASE: weeklyreport
+      MYSQL_USER: user01
+      MYSQL_PASSWORD: user01pass
+    volumes:
+      - ./mariadb/data:/var/lib/mysql
+    networks:
+      - netmariadb000
+# ② phpMyAdminコンテナ(MariaDB管理ツール)
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: pma_container
+    environment:
+      PMA_HOST: db # MariaDBのサービス名を指定
+      PMA_USER: user01
+      PMA_PASSWORD: user01pass
+    ports:
+      - "8080:80"
+    networks:
+      - netmariadb000
+
+  # ② TypeScriptコンテナ (Webアプリ)
+  ts-app:
+    build: ./typescript-app
+    container_name: ts_container
+    volumes:
+      - ./typescript-app/src:/app/src
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    networks:
+      - netmariadb000
+
+  # ③ Pythonコンテナ (デスクトップアプリ/GUI)
+  py-app:
+    build: ./python-app
+    container_name: py_container
+    environment:
+      - DISPLAY=host.docker.internal:0.0 # WindowsのX11サーバーへ出力
+    volumes:
+      - ./python-app/src:/app/src
+    depends_on:
+      - db
+    networks:
+      - netmariadb000
+
+networks:
+  netmariadb000:
+    driver: bridge
