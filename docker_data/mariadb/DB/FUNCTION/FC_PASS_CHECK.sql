@@ -15,7 +15,7 @@ BEGIN
     -- パスワードテーブルを参照して一致するか確認
     SELECT EXISTS (
         SELECT 1 FROM PASSWORD 
-        WHERE user_id = in_user_id AND password = FC_PASS_HASH(in_user_id, in_password)
+        WHERE USER_ID = in_user_id AND PASSWORD_HASH = FC_PASS_HASH(in_user_id, in_password)
     ) INTO is_valid;
     
     RETURN is_valid;
