@@ -10,6 +10,15 @@ DETERMINISTIC
 BEGIN
     DECLARE hashed_password VARCHAR(255);
     
+    -- in_user_idがNULLの場合、NULLを返す
+    IF in_user_id IS NULL OR LTRIM(in_user_id) = '' THEN
+        RETURN NULL;
+    END IF;
+    -- in_passwordがNULLまたは空文字の場合、NULLを返す
+    IF in_password IS NULL OR LTRIM(in_password) = '' THEN
+        RETURN NULL;
+    END IF;
+
     -- パスワードをハッシュ化
     SET hashed_password = SHA2(CONCAT(in_user_id, 'user', in_password), 256);
     

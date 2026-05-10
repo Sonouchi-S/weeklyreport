@@ -8,8 +8,15 @@ services:
       MYSQL_DATABASE: weeklyreport
       MYSQL_USER: user01
       MYSQL_PASSWORD: user01pass
+      TZ: Asia/Tokyo
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=Asia/Tokyo
     volumes:
       - ./mariadb/data:/var/lib/mysql
+    ports:
+      - "3306:3306"
     networks:
       - netmariadb000
 # ② phpMyAdminコンテナ(MariaDB管理ツール)

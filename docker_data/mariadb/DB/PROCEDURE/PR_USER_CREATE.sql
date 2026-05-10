@@ -14,18 +14,77 @@ CREATE OR REPLACE PROCEDURE PR_USER_CREATE(
     OUT out_result TEXT
 )
 BEGIN
+    -- エラーハンドル用共通
+    DECLARE v_proc_name VARCHAR(30) DEFAULT 'PR_USER_CREATE'; -- プロシージャ名
+    DECLARE v_sqlstate CHAR(5) DEFAULT '00000';
+    DECLARE v_message TEXT;
+    DECLARE v_err_param TEXT;
+    -- エラーハンドルここまで
+
+    -- プロシージャ固有
     DECLARE v_user_exists INT DEFAULT 0;
     DECLARE v_pass_exists INT DEFAULT 0;
     DECLARE v_user_mn VARCHAR(50);
     DECLARE v_leader_fg TINYINT(1);
 
+    -- エラーハンドル用共通処理
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
-        SET out_result = '処理の実行に失敗しました';
-        RETURN;
-    END;
+        GET DIAGNOSTICS CONDITION 1
+            v_sqlstate = RETURNED_SQLSTATE, 
+            v_message = MESSAGE_TEXT;
 
+            -- 引数（NULL対応: IFNULLでNULLを文字列に変換）
+            SET v_err_param = CONCAT(
+                                    'in_user_id:'
+                                    , IFNULL(in_user_id, 'NULL')
+                                    , ', in_user_ln:'
+                                    , IFNULL(in_user_ln, 'NULL')
+                                    , ', in_user_fn:'
+                                    , IFNULL(in_user_fn, 'NULL')
+                                    , ', in_user_mn:'
+                                    , IFNULL(in_user_mn, 'NULL')
+                                    , ', in_leader_fg:'
+                                    , IFNULL(in_leader_fg, 'NULL')
+                                    , ', in_department_cd:'
+                                    , IFNULL(in_department_cd, 'NULL')
+                                    , ', in_add_user:'
+                                    , IFNULL(in_add_user, 'NULL')
+                                    , ', in_password:'
+                                    , IFNULL(in_password, 'NULL')
+                                    , ', v_user_exists:'
+                                    , IFNULL(v_user_exists, 'NULL')
+                                    , ', v_pass_exists:'
+                                    , IFNULL(v_pass_exists, 'NULL')
+                                    , ', v_user_mn:'
+                                    , IFNULL(v_user_mn, 'NULL')
+                                    , ', v_leader_fg:'
+                                    , IFNULL(v_leader_fg, 'NULL')
+                                    );
+
+            -- ログテーブル登録
+            INSERT INTO ERR_LOG
+            (
+            PROC_NAME
+            ,ERR_CODE
+            ,ERR_MESSAGE
+            ,ERR_PARAM
+            )
+            VALUES
+            (
+            v_proc_name
+            ,v_sqlstate
+            ,v_message
+            ,v_err_param
+            );
+
+        SET out_result = CONCAT('処理の実行に失敗しました。\n管理者に問い合わせてください。\n処理\：', v_proc_name, '\nエラーコード\:', v_sqlstate, '\nエラーメッセージ\:', v_message);
+    END;
+    -- エラーハンドルここまで
+
+    -- 本処理
+    SET out_result = '処理の実行に失敗しました';
     IF in_user_mn IS NULL THEN
         SET v_user_mn = '';
     ELSE
