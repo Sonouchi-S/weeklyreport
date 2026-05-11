@@ -135,7 +135,7 @@ BEGIN
         , USER_FN
         , USER_MN
         , LEADER_FG
-        , ENABLE_FG
+        , ENABLED_FG
         , DEPARTMENT_CD
         , ADD_DATE
         , ADD_USER)
