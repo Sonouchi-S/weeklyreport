@@ -3,15 +3,16 @@
 */
 DELIMITER //
 CREATE OR REPLACE PROCEDURE PR_USER_CREATE(
-    IN in_user_id VARCHAR(20),
-    IN in_user_ln VARCHAR(50),
-    IN in_user_fn VARCHAR(50),
-    IN in_user_mn VARCHAR(50),
-    IN in_leader_fg TINYINT(1),
-    IN in_department_cd CHAR(5),
-    IN in_add_user VARCHAR(20),
-    IN in_password VARCHAR(255),
-    OUT out_result TEXT
+    IN in_user_id VARCHAR(20)
+    ,IN in_user_ln VARCHAR(50)
+    ,IN in_user_fn VARCHAR(50)
+    ,IN in_user_mn VARCHAR(50)
+    ,IN in_leader_fg TINYINT(1)
+    ,IN in_enable_fg TINYINT(1)
+    ,IN in_department_cd CHAR(5)
+    ,IN in_add_user VARCHAR(20)
+    ,IN in_password VARCHAR(255)
+    ,OUT out_result TEXT
 )
 BEGIN
     -- エラーハンドル用共通
@@ -26,6 +27,9 @@ BEGIN
     DECLARE v_pass_exists INT DEFAULT 0;
     DECLARE v_user_mn VARCHAR(50);
     DECLARE v_leader_fg TINYINT(1);
+    DECLARE v_enable_fg TINYINT(1);
+    DECLARE v_password VARCHAR(255);
+    -- プロシージャ固有ここまで
 
     -- エラーハンドル用共通処理
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
@@ -47,6 +51,8 @@ BEGIN
                                     , IFNULL(in_user_mn, 'NULL')
                                     , ', in_leader_fg:'
                                     , IFNULL(in_leader_fg, 'NULL')
+                                    , ', in_enable_fg:'
+                                    , IFNULL(in_enable_fg, 'NULL')
                                     , ', in_department_cd:'
                                     , IFNULL(in_department_cd, 'NULL')
                                     , ', in_add_user:'
@@ -61,6 +67,8 @@ BEGIN
                                     , IFNULL(v_user_mn, 'NULL')
                                     , ', v_leader_fg:'
                                     , IFNULL(v_leader_fg, 'NULL')
+                                    , ', v_enable_fg:'
+                                    , IFNULL(v_enable_fg, 'NULL')
                                     );
 
             -- ログテーブル登録
@@ -97,6 +105,18 @@ BEGIN
         SET v_leader_fg = 0; -- デフォルト値を0に設定
     END IF;
 
+    IF in_enable_fg IN (0, 1) THEN
+        SET v_enable_fg = in_enable_fg;
+    ELSE
+        SET v_enable_fg = 1; -- デフォルト値を1に設定
+    END IF;
+
+    IF IFNULL(in_password, '') = '' THEN
+        SET v_password = in_user_id; -- パスワードがNULLの場合、ユーザIDをパスワードとして使用
+    ELSE
+        SET v_password = in_password;
+    END IF;
+
     SELECT COUNT(*) INTO v_user_exists
     FROM `USER` U
     WHERE U.USER_ID = in_user_id;
@@ -109,20 +129,38 @@ BEGIN
         START TRANSACTION;
 
         INSERT INTO `USER`
-        (USER_ID, USER_LN, USER_FN, USER_MN, LEADER_FG, DEPARTMENT_CD, ADD_DATE, ADD_USER)
+        (
+        USER_ID
+        , USER_LN
+        , USER_FN
+        , USER_MN
+        , LEADER_FG
+        , ENABLE_FG
+        , DEPARTMENT_CD
+        , ADD_DATE
+        , ADD_USER)
         VALUES
-        (in_user_id, in_user_ln, in_user_fn, v_user_mn, v_leader_fg, in_department_cd,
+        (in_user_id, in_user_ln, in_user_fn, v_user_mn, v_leader_fg, v_enable_fg, in_department_cd,
          CURRENT_TIMESTAMP, in_add_user);
 
         INSERT INTO `PASSWORD`
-        (USER_ID, PASSWORD_HASH, QUESTION, ANSWER, ADD_DATE, ADD_USER)
+        (
+        USER_ID
+        , PASSWORD_HASH
+        , QUESTION
+        , ANSWER
+        , ADD_DATE
+        , ADD_USER
+        )
         VALUES
-        (in_user_id,
-         FC_PASS_HASH(in_user_id, in_password),
-         '未設定',
-         FC_ANSWER_HASH(in_user_id, '未設定'),
-         CURRENT_TIMESTAMP,
-         in_add_user);
+        (
+        in_user_id
+        , FC_PASS_HASH(in_user_id, v_password)
+        , '未設定'
+        , FC_ANSWER_HASH(in_user_id, '未設定')
+        , CURRENT_TIMESTAMP
+        , in_add_user
+        );
 
         COMMIT;
         SET out_result = 'ユーザの登録が完了しました';

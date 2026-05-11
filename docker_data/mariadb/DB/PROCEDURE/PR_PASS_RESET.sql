@@ -9,14 +9,14 @@ in_question_update_fg: 質問更新フラグ
 */
 DELIMITER //
 CREATE OR REPLACE PROCEDURE PR_PASS_RESET(
-    IN in_user_id VARCHAR(20),
-    IN in_new_password VARCHAR(255),
-    IN in_update_user VARCHAR(20),
-    IN in_reset_fg BOOLEAN,
-    IN in_question VARCHAR(255),
-    IN in_answer VARCHAR(255),
-    IN in_question_update_fg BOOLEAN,
-    OUT out_result TEXT
+    IN in_user_id VARCHAR(20)
+    ,IN in_new_password VARCHAR(255)
+    ,IN in_update_user VARCHAR(20)
+    ,IN in_reset_fg BOOLEAN
+    ,IN in_question VARCHAR(255)
+    ,IN in_answer VARCHAR(255)
+    ,IN in_question_update_fg BOOLEAN
+    ,OUT out_result TEXT
 )
 PROCBODY:BEGIN
     -- エラーハンドル用共通
@@ -24,6 +24,11 @@ PROCBODY:BEGIN
     DECLARE v_sqlstate CHAR(5);
     DECLARE v_message TEXT;
     DECLARE v_err_param TEXT;
+
+    -- プロシージャ固有
+    DECLARE v_new_pass VARCHAR(255); -- 新しいパスワード
+    DECLARE v_action VARCHAR(20); -- 処理内容
+
     -- エラーハンドル用共通処理
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -75,12 +80,6 @@ PROCBODY:BEGIN
     SET v_sqlstate = '00000';
     SET out_result = '処理の実行に失敗しました';
 
-    -- パスワード更新のみの場合、現在のパスワードと同じかチェック
-    IF NOT in_reset_fg AND NOT in_question_update_fg AND FC_PASS_CHECK(in_user_id, in_new_password) THEN
-        SET out_result = '新しいパスワードは現在のパスワードと同じです\n別のパスワードを指定してください';
-        LEAVE PROCBODY;
-    END IF;
-    
     -- 未登録のユーザーIDの場合はエラー
     IF NOT EXISTS (SELECT 1 FROM `USER` WHERE USER_ID = in_user_id) 
     OR NOT EXISTS (SELECT 1 FROM `PASSWORD` WHERE USER_ID = in_user_id)
@@ -89,36 +88,42 @@ PROCBODY:BEGIN
         LEAVE PROCBODY;
     END IF;
 
-    IF in_reset_fg AND NOT in_question_update_fg THEN -- パスワードリセットのみの場合は、パスワードをユーザIDと同じものにリセット
+    IF NOT in_reset_fg AND in_question_update_fg AND in_question IS NOT NULL AND in_answer IS NOT NULL THEN -- 質問のみ更新の場合は、質問と回答を更新
         START TRANSACTION;
-        UPDATE `PASSWORD`
-        SET PASSWORD_HASH = FC_PASS_HASH(in_user_id, in_user_id)
-            , UPDATE_DATE = CURRENT_TIMESTAMP
-            , UPDATE_USER = in_update_user
-        WHERE USER_ID = in_user_id;
-        COMMIT;
-        SET out_result = CONCAT('パスワードのリセットが完了しました\n新しいパスワード: ', in_user_id);
-
-    ELSEIF NOT in_reset_fg AND NOT in_question_update_fg THEN -- パスワード変更のみの場合は、指定された新しいパスワードに更新
-        START TRANSACTION;
-        UPDATE `PASSWORD`
-        SET PASSWORD_HASH = FC_PASS_HASH(in_user_id, in_new_password)
-            , UPDATE_DATE = CURRENT_TIMESTAMP
-            , UPDATE_USER = in_update_user
-        WHERE USER_ID = in_user_id;
-        COMMIT;
-        SET out_result = CONCAT('パスワードの変更が完了しました\n新しいパスワード: ', in_new_password);
-
-    ELSEIF NOT in_reset_fg AND in_question_update_fg AND in_question IS NOT NULL AND in_answer IS NOT NULL THEN -- 質問のみ更新の場合は、質問と回答を更新
-        START TRANSACTION;
-        UPDATE `PASSWORD`
-        SET QUESTION = in_question
-            , ANSWER = FC_ANSWER_HASH(in_user_id,in_answer)
-            , UPDATE_DATE = CURRENT_TIMESTAMP
-            , UPDATE_USER = in_update_user
-        WHERE USER_ID = in_user_id; 
+            UPDATE `PASSWORD`
+            SET QUESTION = in_question
+                , ANSWER = FC_ANSWER_HASH(in_user_id,in_answer)
+                , UPDATE_DATE = CURRENT_TIMESTAMP
+                , UPDATE_USER = in_update_user
+            WHERE USER_ID = in_user_id; 
         COMMIT;
         SET out_result = 'セキュリティ質問の更新が完了しました';
+
+    ELSEIF  NOT in_question_update_fg THEN -- パスワードリセットのみの場合は、パスワードをユーザIDと同じものにリセット
+
+        IF in_reset_fg THEN 
+            SET v_new_pass = in_user_id; -- パスワードリセットの場合はユーザIDと同じパスワードにリセット
+            SET v_action = 'リセット';
+        ELSE
+            IF FC_PASS_CHECK(in_user_id, in_new_password) THEN
+                SET out_result = '新しいパスワードは現在のパスワードと同じです\n別のパスワードを指定してください';
+                LEAVE PROCBODY;
+            END IF;
+
+            SET v_new_pass = in_new_password; -- パスワード変更の場合は指定された新しいパスワードに更新
+            SET v_action = '変更';
+        END IF;
+
+        START TRANSACTION;
+            UPDATE `PASSWORD`
+            SET PASSWORD_HASH = FC_PASS_HASH(in_user_id, v_new_pass)
+                , UPDATE_DATE = CURRENT_TIMESTAMP
+                , UPDATE_USER = in_update_user
+            WHERE USER_ID = in_user_id;
+        COMMIT;
+
+        SET out_result = CONCAT('パスワードの', v_action, 'が完了しました\n新しいパスワード: ', in_user_id);
+
     ELSE
         SET out_result = '不正なパラメータの組み合わせです';
     END IF;
