@@ -69,7 +69,7 @@ PROCBODY:BEGIN
     SET out_result_remark = 'ログインに失敗しました';
 
     IF in_user_id IS NULL OR NOT EXISTS (SELECT 1 FROM USER WHERE USER_ID = in_user_id) THEN
-        SET out_result_remark = 'ユーザーIDがただしくありません\nユーザーID:' + IFNULL(in_user_id,'入力なし');
+        SET out_result_remark = CONCAT('ユーザーIDがただしくありません\nユーザーID:', IFNULL(in_user_id, '入力なし'));
         LEAVE PROCBODY;
     END IF;
 
@@ -79,7 +79,7 @@ PROCBODY:BEGIN
     -- ユーザー有効性チェック
     SELECT EXISTS (
         SELECT 1 FROM USER 
-        WHERE USER_ID = in_user_id AND ENABLE_FG = 1
+        WHERE USER_ID = in_user_id AND ENABLED_FG = 1
     ) INTO v_enabled_fg;
 
     -- ログインチェック処理（例: ユーザーテーブルからユーザーIDとパスワードを照合）
