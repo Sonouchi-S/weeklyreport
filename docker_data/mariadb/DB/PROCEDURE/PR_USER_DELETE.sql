@@ -4,7 +4,7 @@
 戻り値out_result_remark: 処理結果のメッセージ
 */
 DELIMITER //
-CREATE OR REPLACE PROCEDURE PR_LOGIN_CHECK(
+CREATE OR REPLACE PROCEDURE PR_USER_DELETE(
     IN in_user_id VARCHAR(20),
     OUT out_result_check BOOLEAN,
     OUT out_result_remark TEXT
@@ -60,6 +60,8 @@ BEGIN
                WHERE USER_ID = in_user_id;
         DELETE FROM `USER`
                WHERE USER_ID = in_user_id;
+        SET out_result_check = TRUE;
+        SET out_result_remark = 'ユーザーを削除しました';
     END IF;
 
 END//
