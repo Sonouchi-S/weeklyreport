@@ -1,4 +1,6 @@
-/*ユーザの新規登録
+/*ユーザの新規登録・更新
+新規登録：in_new_create_fg = 1
+ユーザ情報更新：in_new_create_fg = 0
 戻り値out_result: 登録結果のメッセージ
 */
 DELIMITER //
@@ -8,10 +10,11 @@ CREATE OR REPLACE PROCEDURE PR_USER_CREATE(
     ,IN in_user_fn VARCHAR(50)
     ,IN in_user_mn VARCHAR(50)
     ,IN in_leader_fg TINYINT(1)
-    ,IN in_enable_fg TINYINT(1)
+    ,IN in_enabled_fg TINYINT(1)
     ,IN in_department_cd CHAR(5)
     ,IN in_add_user VARCHAR(20)
     ,IN in_password VARCHAR(255)
+    ,IN in_new_create_fg BOOLEAN -- 1:新規登録, 0:ユーザ情報更新
     ,OUT out_result TEXT
 )
 BEGIN
@@ -27,7 +30,7 @@ BEGIN
     DECLARE v_pass_exists INT DEFAULT 0;
     DECLARE v_user_mn VARCHAR(50);
     DECLARE v_leader_fg TINYINT(1);
-    DECLARE v_enable_fg TINYINT(1);
+    DECLARE v_enabled_fg TINYINT(1);
     DECLARE v_password VARCHAR(255);
     -- プロシージャ固有ここまで
 
@@ -51,14 +54,16 @@ BEGIN
                                     , IFNULL(in_user_mn, 'NULL')
                                     , ', in_leader_fg:'
                                     , IFNULL(in_leader_fg, 'NULL')
-                                    , ', in_enable_fg:'
-                                    , IFNULL(in_enable_fg, 'NULL')
+                                    , ', in_enabled_fg:'
+                                    , IFNULL(in_enabled_fg, 'NULL')
                                     , ', in_department_cd:'
                                     , IFNULL(in_department_cd, 'NULL')
                                     , ', in_add_user:'
                                     , IFNULL(in_add_user, 'NULL')
                                     , ', in_password:'
                                     , IFNULL(in_password, 'NULL')
+                                    , ', in_new_create_fg:'
+                                    , IFNULL(in_new_create_fg, 'NULL')
                                     , ', v_user_exists:'
                                     , IFNULL(v_user_exists, 'NULL')
                                     , ', v_pass_exists:'
@@ -67,8 +72,8 @@ BEGIN
                                     , IFNULL(v_user_mn, 'NULL')
                                     , ', v_leader_fg:'
                                     , IFNULL(v_leader_fg, 'NULL')
-                                    , ', v_enable_fg:'
-                                    , IFNULL(v_enable_fg, 'NULL')
+                                    , ', v_enabled_fg:'
+                                    , IFNULL(v_enabled_fg, 'NULL')
                                     );
 
             -- ログテーブル登録
@@ -105,10 +110,10 @@ BEGIN
         SET v_leader_fg = 0; -- デフォルト値を0に設定
     END IF;
 
-    IF in_enable_fg IN (0, 1) THEN
-        SET v_enable_fg = in_enable_fg;
+    IF in_enabled_fg IN (0, 1) THEN
+        SET v_enabled_fg = in_enabled_fg;
     ELSE
-        SET v_enable_fg = 1; -- デフォルト値を1に設定
+        SET v_enabled_fg = 1; -- デフォルト値を1に設定
     END IF;
 
     IF IFNULL(in_password, '') = '' THEN
@@ -125,51 +130,81 @@ BEGIN
     FROM `PASSWORD` P
     WHERE P.USER_ID = in_user_id;
 
-    IF v_user_exists = 0 AND v_pass_exists = 0 THEN
-        START TRANSACTION;
+    IF in_new_create_fg = 1 THEN -- 登録処理
+        IF v_user_exists = 0 AND v_pass_exists = 0 THEN 
+            START TRANSACTION;
+        
+            INSERT INTO `USER`
+            (
+            USER_ID
+            , USER_LN
+            , USER_FN
+            , USER_MN
+            , LEADER_FG
+            , ENABLED_FG
+            , DEPARTMENT_CD
+            , ADD_DATE
+            , ADD_USER)
+            VALUES
+            (in_user_id
+            , in_user_ln
+            , in_user_fn
+            , v_user_mn
+            , v_leader_fg
+            , v_enabled_fg
+            , in_department_cd
+            , CURRENT_TIMESTAMP
+            , in_add_user);
 
-        INSERT INTO `USER`
-        (
-        USER_ID
-        , USER_LN
-        , USER_FN
-        , USER_MN
-        , LEADER_FG
-        , ENABLED_FG
-        , DEPARTMENT_CD
-        , ADD_DATE
-        , ADD_USER)
-        VALUES
-        (in_user_id, in_user_ln, in_user_fn, v_user_mn, v_leader_fg, v_enable_fg, in_department_cd,
-         CURRENT_TIMESTAMP, in_add_user);
+            INSERT INTO `PASSWORD`
+            (
+            USER_ID
+            , PASSWORD_HASH
+            , QUESTION
+            , ANSWER
+            , ADD_DATE
+            , ADD_USER
+            )
+            VALUES
+            (
+            in_user_id
+            , FC_PASS_HASH(in_user_id, v_password)
+            , '未設定'
+            , FC_ANSWER_HASH(in_user_id, '未設定')
+            , CURRENT_TIMESTAMP
+            , in_add_user
+            );
 
-        INSERT INTO `PASSWORD`
-        (
-        USER_ID
-        , PASSWORD_HASH
-        , QUESTION
-        , ANSWER
-        , ADD_DATE
-        , ADD_USER
-        )
-        VALUES
-        (
-        in_user_id
-        , FC_PASS_HASH(in_user_id, v_password)
-        , '未設定'
-        , FC_ANSWER_HASH(in_user_id, '未設定')
-        , CURRENT_TIMESTAMP
-        , in_add_user
-        );
+            COMMIT;
+            SET out_result = 'ユーザの登録が完了しました';
 
-        COMMIT;
-        SET out_result = 'ユーザの登録が完了しました';
+        ELSEIF v_user_exists > 0 THEN
+            SET out_result = 'ユーザIDは既に存在しています';
 
-    ELSEIF v_user_exists > 0 THEN
-        SET out_result = 'ユーザIDは既に存在しています';
+        ELSEIF v_pass_exists > 0 THEN
+            SET out_result = 'このユーザIDは既にパスワードが登録されています\n管理者にパスワードのリセットを依頼してください';
+        END IF;
+    ELSEIF in_new_create_fg = 0 THEN -- 更新処理
+        IF v_user_exists > 0 THEN 
+            START TRANSACTION;
 
-    ELSEIF v_pass_exists > 0 THEN
-        SET out_result = 'このユーザIDは既にパスワードが登録されています\n管理者にパスワードのリセットを依頼してください';
+            UPDATE `USER`
+            SET USER_LN = in_user_ln
+            , USER_FN = in_user_fn
+            , USER_MN = v_user_mn
+            , LEADER_FG = v_leader_fg
+            , ENABLED_FG = v_enabled_fg
+            , DEPARTMENT_CD = in_department_cd
+            , UPDATE_DATE = CURRENT_TIMESTAMP
+            , UPDATE_USER = in_add_user
+            WHERE USER_ID = in_user_id;
+
+            COMMIT;
+            SET out_result = 'ユーザの情報を更新しました';
+
+        ELSE
+            SET out_result = CONCAT('ユーザIDがただしくありません。\nユーザID:', IFNULL(in_user_id,'NULL'));
+        END IF;
     END IF;
 END //
 
