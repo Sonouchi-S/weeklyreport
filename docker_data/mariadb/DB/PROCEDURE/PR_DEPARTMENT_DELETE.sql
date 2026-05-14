@@ -1,10 +1,9 @@
-/*
-ユーザーの削除
+/*部署削除
 戻り値out_result: 処理結果のメッセージ
 */
 DELIMITER //
-CREATE OR REPLACE PROCEDURE PR_USER_DELETE(
-    IN in_user_id VARCHAR(20),
+CREATE OR REPLACE PROCEDURE PR_DEPARTMENT_DELETE(
+    IN in_department_cd CHAR(5),
     OUT out_result TEXT
 )
 BEGIN
@@ -23,8 +22,8 @@ BEGIN
 
             -- 引数（NULL対応: IFNULLでNULLを文字列に変換）
             SET v_err_param = CONCAT(
-                                    'in_user_id:'
-                                    , IFNULL(in_user_id, 'NULL')
+                                    'in_department_cd:'
+                                    , IFNULL(in_department_cd, 'NULL')
                                     );
 
             -- ログテーブル登録
@@ -46,18 +45,15 @@ BEGIN
     END;
 
     -- プロシージャ名セット
-    SET v_proc_name = 'PR_USER_DELETE';
+    SET v_proc_name = 'PR_DEPARTMENT_DELETE';
     SET v_sqlstate = '00000';
     SET out_result = '処理の実行に失敗しました';
-
-    IF NOT EXISTS (SELECT 1 FROM USER WHERE USER_ID = in_user_id) THEN
-    SET out_result = CONCAT('ユーザーIDがただしくありません\nユーザーID:', IFNULL(in_user_id,'NULL'));
+    IF NOT EXISTS (SELECT 1 FROM DEPARTMENT WHERE DEPARTMENT_CD = in_department_cd) THEN
+    SET out_result = CONCAT('部署コードがただしくありません\n部署コード:', IFNULL(in_department_cd,'NULL'));
     ELSE
-        DELETE FROM `PASSWORD`
-               WHERE USER_ID = in_user_id;
-        DELETE FROM `USER`
-               WHERE USER_ID = in_user_id;
-        SET out_result = 'ユーザーを削除しました';
+        DELETE FROM `DEPARTMENT`
+               WHERE DEPARTMENT_CD = in_department_cd;
+        SET out_result = '部署を削除しました';
     END IF;
 
 END//

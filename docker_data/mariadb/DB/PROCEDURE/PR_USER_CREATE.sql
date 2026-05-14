@@ -130,7 +130,7 @@ BEGIN
     FROM `PASSWORD` P
     WHERE P.USER_ID = in_user_id;
 
-    IF in_new_create_fg = 1 THEN -- 登録処理
+    IF in_new_create_fg THEN -- 登録処理
         IF v_user_exists = 0 AND v_pass_exists = 0 THEN 
             START TRANSACTION;
         
@@ -184,7 +184,7 @@ BEGIN
         ELSEIF v_pass_exists > 0 THEN
             SET out_result = 'このユーザIDは既にパスワードが登録されています\n管理者にパスワードのリセットを依頼してください';
         END IF;
-    ELSEIF in_new_create_fg = 0 THEN -- 更新処理
+    ELSEIF NOT in_new_create_fg THEN -- 更新処理
         IF v_user_exists > 0 THEN 
             START TRANSACTION;
 
